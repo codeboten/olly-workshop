@@ -11,24 +11,45 @@ import (
 )
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	value := rand.Intn(100)
+	status := http.StatusOK
+
 	entry := log.WithFields(log.Fields{
-		"value": value,
-		"path":  html.EscapeString(r.URL.Path),
+		"value":  value,
+		"path":   html.EscapeString(r.URL.Path),
+		"method": r.Method,
+		"app":    "service-a",
 	})
+
+	time.Sleep(time.Duration(value) * time.Millisecond)
+	defer func(t time.Time, entry *log.Entry) {
+		if status == http.StatusOK {
+			entry.WithFields(log.Fields{
+				"code": status,
+				"tts":  fmt.Sprintf("%2.3f", time.Since(start).Seconds()),
+			}).Info("All is well")
+		} else {
+			entry.WithFields(log.Fields{
+				"code": status,
+				"tts":  fmt.Sprintf("%2.3f", time.Since(start).Seconds()),
+			}).Error("OMG Error!")
+		}
+	}(start, entry)
 	if value < 25 {
-		entry.WithField("code", http.StatusInternalServerError).Error("OMG Error!")
-		http.Error(w, ":-(", http.StatusInternalServerError)
-		return
+		status = http.StatusInternalServerError
 	}
-	time.Sleep(time.Millisecond * 10)
-	entry.WithField("code", http.StatusOK).Info("All is well")
-	fmt.Fprintf(w, ":-)")
+	if status == http.StatusOK {
+		fmt.Fprintf(w, ":-)")
+	} else {
+		http.Error(w, ":-(", http.StatusInternalServerError)
+	}
 }
 
 func main() {
 
 	log.SetFormatter(&log.JSONFormatter{})
+	log.SetReportCaller(true)
 	http.HandleFunc("/", defaultHandler)
 
 	log.Fatal(http.ListenAndServe("localhost:8080", nil))

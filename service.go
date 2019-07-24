@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html"
 	"math/rand"
 	"net/http"
 	"time"
@@ -11,17 +12,17 @@ import (
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	value := rand.Intn(100)
+	entry := log.WithFields(log.Fields{
+		"value": value,
+		"path":  html.EscapeString(r.URL.Path),
+	})
 	if value < 25 {
-		log.WithFields(log.Fields{
-			"value": value,
-		}).Error("OMG Error!")
+		entry.WithField("code", http.StatusInternalServerError).Error("OMG Error!")
 		http.Error(w, ":-(", http.StatusInternalServerError)
 		return
 	}
 	time.Sleep(time.Millisecond * 10)
-	log.WithFields(log.Fields{
-		"value": value,
-	}).Info("All is well")
+	entry.WithField("code", http.StatusOK).Info("All is well")
 	fmt.Fprintf(w, ":-)")
 }
 

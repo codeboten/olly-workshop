@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"math/rand"
@@ -12,9 +13,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func doStuff() (int, error) {
+	value := rand.Intn(100)
+	var err error
+	time.Sleep(time.Duration(value) * time.Millisecond)
+	if value < 25 {
+		err = errors.New("below threshold")
+	} else {
+		err = nil
+	}
+	return value, err
+}
+
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	value := rand.Intn(100)
 	status := http.StatusOK
 
 	entry := log.WithFields(log.Fields{
@@ -23,7 +35,6 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 		"app":    "service-a",
 	})
 
-	time.Sleep(time.Duration(value) * time.Millisecond)
 	defer func(t time.Time, entry *log.Entry) {
 		if status == http.StatusOK {
 			entry.WithFields(log.Fields{
@@ -37,26 +48,25 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 			}).Error("OMG Error!")
 		}
 	}(start, entry)
-	if value < 25 {
-		status = http.StatusInternalServerError
-	}
-	if status == http.StatusOK {
+	_, err := doStuff()
+	if err == nil {
 		fmt.Fprintf(w, ":-)")
 	} else {
-		http.Error(w, ":-(", http.StatusInternalServerError)
+		status = http.StatusInternalServerError
+		http.Error(w, ":-(", status)
 	}
 }
 
 func main() {
-	log.SetFormatter(&log.JSONFormatter{
+	log.SetFormatter(&log.TextFormatter{
 		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
 			parts := strings.Split(f.File, "/")
 			return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("%s:%d", parts[len(parts)-1], f.Line)
 		},
+		DisableColors: true,
 	})
 	log.SetReportCaller(true)
 	http.HandleFunc("/", defaultHandler)
 
 	log.Fatal(http.ListenAndServe("localhost:8080", nil))
-
 }

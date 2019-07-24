@@ -5,6 +5,8 @@ import (
 	"html"
 	"math/rand"
 	"net/http"
+	"runtime"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,7 +18,6 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 
 	entry := log.WithFields(log.Fields{
-		"value":  value,
 		"path":   html.EscapeString(r.URL.Path),
 		"method": r.Method,
 		"app":    "service-a",
@@ -47,8 +48,12 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-
-	log.SetFormatter(&log.JSONFormatter{})
+	log.SetFormatter(&log.JSONFormatter{
+		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+			parts := strings.Split(f.File, "/")
+			return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("%s:%d", parts[len(parts)-1], f.Line)
+		},
+	})
 	log.SetReportCaller(true)
 	http.HandleFunc("/", defaultHandler)
 
